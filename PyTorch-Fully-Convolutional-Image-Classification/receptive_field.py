@@ -13,6 +13,8 @@ from torch.nn.modules.conv import _ConvNd
 import matplotlib.pyplot as plt
 import cv2
 from torch import isfinite
+import math
+
 
 LAYER_INDEX = 0
 
@@ -102,6 +104,10 @@ class FullyConvolutionalResnet50(models.ResNet):
         )
         self.last_conv.bias.data.copy_(self.fc.bias.data)
 
+        for module in self.modules():
+            if isinstance(module, torch.nn.modules.BatchNorm2d):
+                module.eval()
+
     # Reimplementing forward pass.
     # Replacing the following code
     # https://github.com/pytorch/vision/blob/b2e95657cd5f389e3973212ba7ddbdcc751a7878/torchvision/models/resnet.py#L197-L213
@@ -123,17 +129,21 @@ class FullyConvolutionalResnet50(models.ResNet):
 
 
 def visualize_rf_with_backprop(model):
+    model = model.train()
     for module in model.modules():
         try:
-            nn.init.ones_(module.weight)
+            nn.init.constant_(module.weight, 0.05)
             nn.init.zeros_(module.bias)
-            nn.init.ones_(module.running_mean)
-            nn.init.zeros_(module.running_var)
+            nn.init.zeros_(module.running_mean)
+            nn.init.ones_(module.running_var)
         except:
             pass
 
-    model = model.train()
+        if isinstance(module, torch.nn.modules.BatchNorm2d):
+            module.eval()
+
     img = torch.ones(size=(1, 3, 1000, 1000), requires_grad=True)
+
     out = model(img)
     grad = torch.zeros_like(out)
     # grad[0, 0, grad.size()[2] // 2, grad.size()[3] // 2] = 1
@@ -141,6 +151,16 @@ def visualize_rf_with_backprop(model):
     # img.grad.zero_()
     out.backward(gradient=grad)
     grad_np = img.grad[0, 0].data.numpy()
+
+    # for module in model.modules():
+    #     print(module)
+    #     try:
+    #         print('weight', module.weight)
+    #         print('bias', module.bias)
+    #         print('running_mean', module.running_mean)
+    #         print('running_var', module.running_var)
+    #     except:
+    #         pass
     # grad_np_min = np.amin(grad_np)
     # value_range = grad_np_max - grad_np_min
     # print('value_range: ', value_range)
@@ -148,7 +168,7 @@ def visualize_rf_with_backprop(model):
     # print('max_value: ', grad_np_max)
     # grad_np = np.fabs(grad_np) / np.amax(grad_np)
     grad_np = grad_np / np.amax(grad_np)
-    _, grad_np = cv2.threshold(grad_np, 1e-6, 1., cv2.THRESH_BINARY)
+    # _, grad_np = cv2.threshold(grad_np, 1e-6, 1., cv2.THRESH_BINARY)
     # grad_np = np.ascontiguousarray(np.stack([grad_np, grad_np, grad_np], axis=2))
     # grad_np = np.transpose(grad_np, (1, 2, 0))
     # _, grad_positive = cv2.threshold(grad_np, 1e-3, 255, cv2.THRESH_BINARY)
@@ -157,15 +177,23 @@ def visualize_rf_with_backprop(model):
     # grad_image = grad_image.astype(np.uint8)
     # grad_image = np.ascontiguousarray(np.stack([grad_image, grad_image, grad_image], axis=0))
     # idx_nonzeros=np.where(grad_np!=0)
-    plt.imshow(grad_np)
+
+    fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True)
+
+    ax[0].set_title('Receptive Field')
+    ax[0].imshow(grad_np)
+
+    ax[1].set_title('Non-zero Element Mask')
+    ax[1].imshow(grad_np > 0)
+
     plt.show()
-    # cv2.imshow("grad", grad_image)
-    # cv2.waitKey(0)
 
 
 def main():
-    # model = FullyConvolutionalResnet18().eval()
+    # # model = FullyConvolutionalResnet18().eval()
     model = FullyConvolutionalResnet50()
+    visualize_rf_with_backprop(model)
+
     hook_handlers = []
     for module in model.modules():
         hook = get_receptive_filed_calc_by_module(module)
@@ -192,7 +220,6 @@ def main():
     for handler in hook_handlers:
         handler.remove()
 
-    visualize_rf_with_backprop(model)
 
 
 if __name__ == "__main__":
