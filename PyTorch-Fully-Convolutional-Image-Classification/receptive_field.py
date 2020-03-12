@@ -127,16 +127,17 @@ def visualize_rf_with_backprop(model):
         try:
             nn.init.ones_(module.weight)
             nn.init.zeros_(module.bias)
-            nn.init.zeros_(module.running_mean)
+            nn.init.ones_(module.running_mean)
             nn.init.zeros_(module.running_var)
         except:
             pass
 
     model = model.train()
-    img = torch.ones(size=(1, 3, 224, 224), requires_grad=True)
+    img = torch.ones(size=(1, 3, 1000, 1000), requires_grad=True)
     out = model(img)
     grad = torch.zeros_like(out)
-    grad[0, 0, grad.size()[2] // 2, grad.size()[3] // 2] = 1
+    # grad[0, 0, grad.size()[2] // 2, grad.size()[3] // 2] = 1
+    grad[0, 0, 1, 1] = 1
     # img.grad.zero_()
     out.backward(gradient=grad)
     grad_np = img.grad[0, 0].data.numpy()
@@ -145,8 +146,9 @@ def visualize_rf_with_backprop(model):
     # print('value_range: ', value_range)
     # print('min_value: ', grad_np_min)
     # print('max_value: ', grad_np_max)
-    grad_np = np.fabs(grad_np) / np.amax(grad_np)
-    _, grad_np = cv2.threshold(grad_np, 1e-4, 1., cv2.THRESH_BINARY)
+    # grad_np = np.fabs(grad_np) / np.amax(grad_np)
+    grad_np = grad_np / np.amax(grad_np)
+    _, grad_np = cv2.threshold(grad_np, 1e-6, 1., cv2.THRESH_BINARY)
     # grad_np = np.ascontiguousarray(np.stack([grad_np, grad_np, grad_np], axis=2))
     # grad_np = np.transpose(grad_np, (1, 2, 0))
     # _, grad_positive = cv2.threshold(grad_np, 1e-3, 255, cv2.THRESH_BINARY)
