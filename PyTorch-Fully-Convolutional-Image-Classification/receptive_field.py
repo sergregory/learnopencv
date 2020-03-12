@@ -13,7 +13,6 @@ from torch.nn.modules.conv import _ConvNd
 import matplotlib.pyplot as plt
 import cv2
 from torch import isfinite
-import math
 
 
 LAYER_INDEX = 0
@@ -132,7 +131,7 @@ def visualize_rf_with_backprop(model):
     model = model.train()
     for module in model.modules():
         try:
-            nn.init.constant_(module.weight, 0.05)
+            nn.init.constant_(module.weight, 0.05) # inference overflows with ones
             nn.init.zeros_(module.bias)
             nn.init.zeros_(module.running_mean)
             nn.init.ones_(module.running_var)
@@ -151,22 +150,6 @@ def visualize_rf_with_backprop(model):
     # img.grad.zero_()
     out.backward(gradient=grad)
     grad_np = img.grad[0, 0].data.numpy()
-
-    # for module in model.modules():
-    #     print(module)
-    #     try:
-    #         print('weight', module.weight)
-    #         print('bias', module.bias)
-    #         print('running_mean', module.running_mean)
-    #         print('running_var', module.running_var)
-    #     except:
-    #         pass
-    # grad_np_min = np.amin(grad_np)
-    # value_range = grad_np_max - grad_np_min
-    # print('value_range: ', value_range)
-    # print('min_value: ', grad_np_min)
-    # print('max_value: ', grad_np_max)
-    # grad_np = np.fabs(grad_np) / np.amax(grad_np)
     grad_np = grad_np / np.amax(grad_np)
     # _, grad_np = cv2.threshold(grad_np, 1e-6, 1., cv2.THRESH_BINARY)
     # grad_np = np.ascontiguousarray(np.stack([grad_np, grad_np, grad_np], axis=2))
@@ -207,7 +190,6 @@ def main():
         except:
             pass
 
-    # print(model)
     input = torch.zeros(size=(1, 3, 224 * 2, 224 * 2))
     input[0, 0, 0, 0] = 1
     input[0, 0, 0, 1] = 1
@@ -219,7 +201,6 @@ def main():
         )
     for handler in hook_handlers:
         handler.remove()
-
 
 
 if __name__ == "__main__":
