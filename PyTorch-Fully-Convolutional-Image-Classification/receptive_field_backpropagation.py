@@ -11,7 +11,7 @@ from FullyConvolutionalResnet18 import FullyConvolutionalResnet18
 Rect = namedtuple('Rect', 'x1 y1 x2 y2')
 
 
-def backprop_receiptive_field(image, predicted_class, scoremap, use_max_activation=True):
+def backprop_receptive_field(image, predicted_class, scoremap, use_max_activation=True):
     model = FullyConvolutionalResnet18()
     model = model.train()
     for module in model.modules():
@@ -73,14 +73,15 @@ def normalize(activations):
     return activations
 
 
-def visualize_activations(image, activations):
-    rect = find_rect(activations)
+def visualize_activations(image, activations, show_bounding_rect=False):
     activations = normalize(activations)
 
-    activations = cv2.cvtColor(activations, cv2.COLOR_GRAY2BGR)
-    masked_image = (image * activations).astype(np.uint8)
+    activations_multichannel = np.stack([activations, activations, activations], axis=2)
+    masked_image = (image * activations_multichannel).astype(np.uint8)
 
-    # cv2.rectangle(masked_image, (rect.x1, rect.y1), (rect.x2, rect.y2), color=(0, 0, 255), thickness=2)
+    if show_bounding_rect:
+        rect = find_rect(activations)
+        cv2.rectangle(masked_image, (rect.x1, rect.y1), (rect.x2, rect.y2), color=(0, 0, 255), thickness=2)
 
     return masked_image
 
@@ -136,8 +137,8 @@ def run_resnet_inference(original_image):
         score_map = preds[0, predicted_class, :, :].cpu()
         print('Score Map shape : ', score_map.shape)
 
-    # Compute the receiptive filed for the inference result
-    receiptive_field_map = backprop_receiptive_field(image, scoremap=score_map, predicted_class=predicted_class)
+    # Compute the receptive filed for the inference result
+    receptive_field_map = backprop_receptive_field(image, scoremap=score_map, predicted_class=predicted_class)
 
     # Resize score map to the original image size
     score_map = score_map.numpy()[0]
@@ -146,7 +147,7 @@ def run_resnet_inference(original_image):
     # Display the images
     cv2.imshow("Original Image", original_image)
     cv2.imshow("Score map: activations and bbox", visualize_activations(original_image, score_map))
-    cv2.imwrite("receiptive_field_max_activation.jpg", visualize_activations(original_image, receiptive_field_map))
+    cv2.imshow("receptive_field_max_activation", visualize_activations(original_image, receptive_field_map, show_bounding_rect=True))
     cv2.waitKey(0)
 
 
