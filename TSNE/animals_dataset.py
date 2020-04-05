@@ -8,16 +8,16 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 colors_per_class = {
-    'dog' : (254, 202, 87),
-    'horse' : (255, 107, 107),
-    'elephant' : (10, 189, 227),
-    'butterfly' : (255, 159, 243),
-    'chicken' : (16, 172, 132),
-    'cat' : (52, 31, 151),
-    'cow' : (0, 210, 211),
-    'sheep' : (84, 160, 255),
-    'spider' : (87, 101, 116),
-    'squirrel' : (200, 214, 229),
+    'dog' : [254, 202, 87],
+    'horse' : [255, 107, 107],
+    'elephant' : [10, 189, 227],
+    'butterfly' : [255, 159, 243],
+    'chicken' : [16, 172, 132],
+    'cat' : [128, 80, 128],
+    'cow' : [87, 101, 116],
+    'sheep' : [52, 31, 151],
+    'spider' : [0, 0, 0],
+    'squirrel' : [100, 100, 255],
 }
 
 
@@ -55,6 +55,8 @@ class AnimalsDataset(torch.utils.data.Dataset):
         num_images = min(num_images, len(self.data))
         self.data = random.sample(self.data, num_images) # only use num_images images
 
+        # We use the transforms described in official PyTorch ResNet inference example:
+        # https://pytorch.org/hub/pytorch_vision_resnet/.
         self.transform = transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),

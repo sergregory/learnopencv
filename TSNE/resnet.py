@@ -6,9 +6,9 @@ from torch.hub import load_state_dict_from_url
 # Define the architecture by modifying resnet.
 # Original code is here
 # https://github.com/pytorch/vision/blob/b2e95657cd5f389e3973212ba7ddbdcc751a7878/torchvision/models/resnet.py
-class Resnet(models.ResNet):
+class ResNet101(models.ResNet):
     def __init__(self, num_classes=1000, pretrained=True, **kwargs):
-        # Start with standard resnet50 defined here
+        # Start with standard resnet101 defined here
         # https://github.com/pytorch/vision/blob/b2e95657cd5f389e3973212ba7ddbdcc751a7878/torchvision/models/resnet.py
         super().__init__(block=models.resnet.Bottleneck, layers=[3, 4, 23, 3], num_classes=num_classes, **kwargs)
         if pretrained:

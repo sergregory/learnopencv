@@ -5,19 +5,20 @@ import torch
 import random
 import numpy as np
 from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
 
 from animals_dataset import AnimalsDataset, collate_skip_empty, colors_per_class
-from resnet import Resnet
+from resnet import ResNet101
 
 
 def fix_random_seeds():
-    seed = 42
+    seed = 10
     random.seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
 
 
-def get_model_outputs(dataset, batch, num_images):
+def get_features(dataset, batch, num_images):
     # move the input and model to GPU for speed if available
     if torch.cuda.is_available():
         device = 'cuda'
@@ -25,7 +26,7 @@ def get_model_outputs(dataset, batch, num_images):
         device = 'cpu'
 
     # initialize our implementation of ResNet
-    model = Resnet(pretrained=True)
+    model = ResNet101(pretrained=True)
     model.eval()
     model.to(device)
 
@@ -34,7 +35,7 @@ def get_model_outputs(dataset, batch, num_images):
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch, collate_fn=collate_skip_empty, shuffle=True)
 
     # we'll store the features as NumPy array of size num_images x feature_size
-    outputs = None
+    features = None
 
     # we'll also store the image labels and paths to visualize them later
     labels = []
@@ -48,56 +49,13 @@ def get_model_outputs(dataset, batch, num_images):
         with torch.no_grad():
             output = model.forward(images)
 
-        current_outputs = output.cpu().numpy()
-        if outputs is not None:
-            outputs = np.concatenate((outputs, current_outputs))
+        current_features = output.cpu().numpy()
+        if features is not None:
+            features = np.concatenate((features, current_features))
         else:
-            outputs = current_outputs
+            features = current_features
 
-    return outputs, labels, image_paths
-
-
-def plot_legend(colors_per_class):
-    width = 300
-
-    offset = 30
-    color_size = 30
-    color_offset = 5
-
-    row_height = color_size + 2 * color_offset
-    num_colors = len(colors_per_class)
-
-    height = row_height * num_colors
-
-    legend = np.zeros((height, width, 3), np.uint8)
-    legend.fill(255)
-
-    for i, label in enumerate(sorted(colors_per_class)):
-        color = colors_per_class[label]
-
-        tl_x = offset + 1
-        tl_y = row_height * i + color_offset
-
-        br_x = tl_x + color_size
-        br_y = tl_y + color_size
-
-        legend = cv2.rectangle(
-            legend,
-            (tl_x, tl_y),
-            (br_x, br_y),
-            color=color,
-            thickness=cv2.FILLED
-        )
-        legend = cv2.putText(
-            legend,
-            label,
-            (br_x + offset, br_y - 2 * color_offset),
-            fontFace=cv2.FONT_HERSHEY_TRIPLEX,
-            fontScale=0.5,
-            color=(0, 0, 0)
-        )
-
-    cv2.imshow('legend', legend)
+    return features, labels, image_paths
 
 
 def scale_to_01_range(x):
@@ -132,7 +90,10 @@ def compute_plot_coordinates(image, x, y, image_centers_area_size, offset):
 
     # compute the image center coordinates on the plot
     center_x = int(image_centers_area_size * x) + offset
-    center_y = int(image_centers_area_size * y) + offset
+
+    # in matplotlib, the y axis is directed upward
+    # to have the same here, we need to mirror the y coordinate
+    center_y = int(image_centers_area_size * (1 - y)) + offset
 
     # knowing the image center, compute the coordinates of the top left and bottom right corner
     tl_x = center_x - int(image_width / 2)
@@ -144,15 +105,7 @@ def compute_plot_coordinates(image, x, y, image_centers_area_size, offset):
     return tl_x, tl_y, br_x, br_y
 
 
-def visualize_tsne_plot(tsne, images, labels, plot_size=1000, max_image_size=100):
-    # extract x and y coordinates representing the positions of the images on T-SNE plot
-    tx = tsne[:, 0]
-    ty = tsne[:, 1]
-
-    # scale and move the coordinates so they fit [0; 1] range
-    tx = scale_to_01_range(tx)
-    ty = scale_to_01_range(ty)
-
+def visualize_tsne_images(tx, ty, images, labels, plot_size=1000, max_image_size=100):
     # we'll put the image centers in the central area of the plot
     # and use offsets to make sure the images fit the plot
     offset = max_image_size // 2
@@ -181,10 +134,52 @@ def visualize_tsne_plot(tsne, images, labels, plot_size=1000, max_image_size=100
         # put the image to its TSNE coordinates using numpy subarray indices
         tsne_plot[tl_y:br_y, tl_x:br_x, :] = image
 
-    plot_legend(colors_per_class)
-
     cv2.imshow('T-SNE', tsne_plot)
     cv2.waitKey()
+
+
+def visualize_tsne_points(tx, ty, labels):
+    # initialize matplotlib plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    # for every class, we'll add a scatter plot separately
+    for label in colors_per_class:
+        # find the samples of the current class in the data
+        indices = [i for i, l in enumerate(labels) if l == label]
+
+        # extract the coordinates of the points of this class only
+        current_tx = np.take(tx, indices)
+        current_ty = np.take(ty, indices)
+
+        # convert the class color to matplotlib format:
+        # BGR -> RGB, divide by 255, convert to np.array
+        color = np.array([colors_per_class[label][::-1]], dtype=np.float) / 255
+
+        # add a scatter plot with te correponding color and label
+        ax.scatter(current_tx, current_ty, c=color, label=label)
+
+    # build a legend using the labels we set previously
+    ax.legend(loc='best')
+
+    # finally, show the plot
+    plt.show()
+
+
+def visualize_tsne(tsne, images, labels, plot_size=1000, max_image_size=100):
+    # extract x and y coordinates representing the positions of the images on T-SNE plot
+    tx = tsne[:, 0]
+    ty = tsne[:, 1]
+
+    # scale and move the coordinates so they fit [0; 1] range
+    tx = scale_to_01_range(tx)
+    ty = scale_to_01_range(ty)
+
+    # visualize the plot: samples as colored points
+    visualize_tsne_points(tx, ty, labels)
+
+    # visualize the plot: samples as images
+    visualize_tsne_images(tx, ty, images, labels, plot_size=1000, max_image_size=50)
 
 
 def main():
@@ -197,15 +192,15 @@ def main():
 
     fix_random_seeds()
 
-    model_outputs, labels, image_paths = get_model_outputs(
+    features, labels, image_paths = get_features(
         dataset=args.path,
         batch=args.batch,
         num_images=args.num_images
     )
 
-    tsne = TSNE(n_components=2).fit_transform(model_outputs)
+    tsne = TSNE(n_components=2).fit_transform(features)
 
-    visualize_tsne_plot(tsne, image_paths, labels)
+    visualize_tsne(tsne, image_paths, labels)
 
 if __name__ == '__main__':
     main()
