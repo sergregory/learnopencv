@@ -118,7 +118,7 @@ def visualize_tsne_images(tx, ty, images, labels, plot_size=1000, max_image_size
     offset = max_image_size // 2
     image_centers_area_size = plot_size - 2 * offset
 
-    tsne_plot = 255 * np.zeros((plot_size, plot_size, 3), np.uint8)
+    tsne_plot = 255 * np.ones((plot_size, plot_size, 3), np.uint8)
 
     # now we'll put a small copy of every image to its corresponding T-SNE coordinate
     for image_path, label, x, y in tqdm(
