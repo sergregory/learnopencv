@@ -58,9 +58,16 @@ def get_features(dataset, batch, num_images):
     return features, labels, image_paths
 
 
+# scale and move the coordinates so they fit [0; 1] range
 def scale_to_01_range(x):
+    # compute the distribution range
     value_range = (np.max(x) - np.min(x))
+
+    # move the distribution so that it starts from zero
+    # by extracting the minimal value from all its values
     starts_from_zero = x - np.min(x)
+
+    # make the distribution fit [0; 1] by dividing by its range
     return starts_from_zero / value_range
 
 
@@ -111,8 +118,7 @@ def visualize_tsne_images(tx, ty, images, labels, plot_size=1000, max_image_size
     offset = max_image_size // 2
     image_centers_area_size = plot_size - 2 * offset
 
-    tsne_plot = np.zeros((plot_size, plot_size, 3), np.uint8)
-    tsne_plot.fill(255)
+    tsne_plot = 255 * np.zeros((plot_size, plot_size, 3), np.uint8)
 
     # now we'll put a small copy of every image to its corresponding T-SNE coordinate
     for image_path, label, x, y in tqdm(
@@ -156,7 +162,7 @@ def visualize_tsne_points(tx, ty, labels):
         # BGR -> RGB, divide by 255, convert to np.array
         color = np.array([colors_per_class[label][::-1]], dtype=np.float) / 255
 
-        # add a scatter plot with te correponding color and label
+        # add a scatter plot with the correponding color and label
         ax.scatter(current_tx, current_ty, c=color, label=label)
 
     # build a legend using the labels we set previously
@@ -179,7 +185,7 @@ def visualize_tsne(tsne, images, labels, plot_size=1000, max_image_size=100):
     visualize_tsne_points(tx, ty, labels)
 
     # visualize the plot: samples as images
-    visualize_tsne_images(tx, ty, images, labels, plot_size=1000, max_image_size=50)
+    visualize_tsne_images(tx, ty, images, labels, plot_size=plot_size, max_image_size=max_image_size)
 
 
 def main():
